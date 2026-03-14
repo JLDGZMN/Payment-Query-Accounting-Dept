@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS \`user\` (
   \`image\`         VARCHAR(255),
   \`createdAt\`     DATETIME      NOT NULL,
   \`updatedAt\`     DATETIME      NOT NULL,
+  \`username\`      VARCHAR(255)  UNIQUE,
+  \`displayUsername\` VARCHAR(255),
   PRIMARY KEY (\`id\`)
 );
 
@@ -77,6 +79,22 @@ CREATE TABLE IF NOT EXISTS \`payments\` (
 );
 `;
 
+// Columns to ensure exist on already-created tables: [table, column, definition]
+const alterations = [
+  ["user", "username",        "VARCHAR(255) UNIQUE"],
+  ["user", "displayUsername", "VARCHAR(255)"],
+];
+
+async function columnExists(conn, table, column) {
+  const db = process.env.DATABASE_URL.split("/").pop().split("?")[0];
+  const [rows] = await conn.query(
+    `SELECT 1 FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [db, table, column]
+  );
+  return rows.length > 0;
+}
+
 const conn = await pool.getConnection();
 try {
   for (const statement of sql.split(";").map((s) => s.trim()).filter(Boolean)) {
@@ -84,6 +102,15 @@ try {
     const match = statement.match(/CREATE TABLE IF NOT EXISTS `(\w+)`/);
     if (match) console.log(`✓ Table "${match[1]}" ready`);
   }
+
+  // Add any missing columns to existing tables
+  for (const [table, column, definition] of alterations) {
+    if (!(await columnExists(conn, table, column))) {
+      await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+      console.log(`✓ Added column "${column}" to "${table}"`);
+    }
+  }
+
   console.log("\nMigration complete.");
 } catch (err) {
   console.error("Migration failed:", err.message);
