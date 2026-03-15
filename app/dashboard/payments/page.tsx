@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import {
   PencilSimpleIcon,
-  TrashIcon,
   CreditCardIcon,
   ReceiptIcon,
   UsersIcon,
@@ -96,7 +95,7 @@ interface Payment {
 }
 
 const emptyForm = {
-  or_date: new Date().toISOString().slice(0, 10),
+  or_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })(),
   or_no_start: "",
   or_no_end: "",
   pieces: "",
@@ -115,16 +114,24 @@ export default function PaymentsPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [deleteRow, setDeleteRow] = useState<Payment | null>(null);
 
+  const [passwordPromptRow, setPasswordPromptRow] = useState<Payment | null>(null);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const [newIds, setNewIds] = useState<Set<number>>(new Set());
+  const [editedIds, setEditedIds] = useState<Set<number>>(new Set());
+
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterColumn, setFilterColumn] = useState<string>("");
   const [filterValue, setFilterValue] = useState<string>("");
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });
 
   useEffect(() => { fetchPayments(); }, []);
 
   useEffect(() => {
     if (editRow) {
       setEditForm({
-        or_date: editRow.or_date.slice(0, 10),
+        or_date: (() => { const d = new Date(editRow.or_date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })(),
         or_no_start: editRow.or_no_start,
         or_no_end: editRow.or_no_end,
         pieces: String(editRow.pieces),
@@ -160,6 +167,10 @@ export default function PaymentsPage() {
       const created: Payment = await res.json();
       setPayments((prev) => [created, ...prev]);
       setForm(emptyForm);
+      setNewIds((prev) => new Set(prev).add(created.id));
+      setTimeout(() => {
+        setNewIds((prev) => { const next = new Set(prev); next.delete(created.id); return next; });
+      }, 4000);
     } else {
       const data = await res.json();
       setInsertError(data.error ?? "Failed to insert record.");
@@ -179,9 +190,24 @@ export default function PaymentsPage() {
       const updated: Payment = await res.json();
       setPayments((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setEditRow(null);
+      setEditedIds((prev) => new Set(prev).add(updated.id));
+      setTimeout(() => {
+        setEditedIds((prev) => { const next = new Set(prev); next.delete(updated.id); return next; });
+      }, 4000);
     } else {
       const data = await res.json();
       setEditError(data.error ?? "Failed to update record.");
+    }
+  }
+
+  function handlePasswordSubmit() {
+    if (passwordInput === "password") {
+      setEditRow(passwordPromptRow);
+      setPasswordPromptRow(null);
+      setPasswordInput("");
+      setPasswordError(null);
+    } else {
+      setPasswordError("Incorrect password.");
     }
   }
 
@@ -199,11 +225,16 @@ export default function PaymentsPage() {
       {
         accessorKey: "or_date",
         header: "O.R. Date",
+        filterFn: (row, columnId, filterValue) => {
+          const d = new Date(String(row.getValue(columnId)));
+          const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          return local === filterValue;
+        },
         cell: ({ getValue }) =>
-          format(parseISO(String(getValue()).slice(0, 10)), "MM/dd/yyyy"),
+          format(new Date(String(getValue())), "MM/dd/yyyy"),
       },
-      { accessorKey: "or_no_start", header: "O.R. No. Start", filterFn: "includesString" },
-      { accessorKey: "or_no_end", header: "O.R. No. End", filterFn: "includesString" },
+      { accessorKey: "or_no_start", header: "O.R. No. Start", filterFn: (row, columnId, filterValue) => String(row.getValue(columnId)).startsWith(String(filterValue)) },
+      { accessorKey: "or_no_end", header: "O.R. No. End", filterFn: (row, columnId, filterValue) => String(row.getValue(columnId)).startsWith(String(filterValue)) },
       { accessorKey: "pieces", header: "Pieces", filterFn: "includesString" },
       {
         accessorKey: "rcd_amount",
@@ -222,11 +253,12 @@ export default function PaymentsPage() {
         header: "Actions",
         cell: ({ row }) => (
           <div className="flex gap-1">
-            <Button size="icon-sm" variant="ghost" onClick={() => setEditRow(row.original)}>
+            <Button size="icon-sm" variant="ghost" onClick={() => {
+              setPasswordPromptRow(row.original);
+              setPasswordInput("");
+              setPasswordError(null);
+            }}>
               <PencilSimpleIcon />
-            </Button>
-            <Button size="icon-sm" variant="destructive" onClick={() => setDeleteRow(row.original)}>
-              <TrashIcon />
             </Button>
           </div>
         ),
@@ -238,12 +270,13 @@ export default function PaymentsPage() {
   const table = useReactTable({
     data: payments,
     columns,
-    state: { columnFilters },
+    state: { columnFilters, pagination },
     onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: setPagination,
+    autoResetPageIndex: false,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: PAGE_SIZE } },
   });
 
   const FILTER_COLUMNS = [
@@ -283,10 +316,10 @@ export default function PaymentsPage() {
         {(() => {
           const totalRCD = payments.reduce((sum, p) => sum + Number(p.rcd_amount), 0);
           const totalPieces = payments.reduce((sum, p) => sum + Number(p.pieces), 0);
-          const today = new Date().toISOString().slice(0, 10);
-          const todayRows = payments.filter((p) => p.or_date.slice(0, 10) === today);
-          const todayRCD = todayRows.reduce((sum, p) => sum + Number(p.rcd_amount), 0);
           const uniqueCollectors = new Set(payments.map((p) => p.collector)).size;
+          const isFiltered = columnFilters.length > 0;
+          const filteredRows = table.getFilteredRowModel().rows;
+          const filteredRCD = filteredRows.reduce((sum, r) => sum + Number(r.original.rcd_amount), 0);
 
           const stats = [
             {
@@ -302,9 +335,13 @@ export default function PaymentsPage() {
               icon: StackIcon,
             },
             {
-              label: "Today's RCD Amount",
-              value: todayRCD.toLocaleString("en-PH", { style: "currency", currency: "PHP" }),
-              description: `${todayRows.length} record${todayRows.length !== 1 ? "s" : ""} today`,
+              label: "Filtered RCD Amount",
+              value: isFiltered
+                ? filteredRCD.toLocaleString("en-PH", { style: "currency", currency: "PHP" })
+                : "—",
+              description: isFiltered
+                ? `${filteredRows.length} filtered record${filteredRows.length !== 1 ? "s" : ""}`
+                : "Apply a filter to see total",
               icon: ReceiptIcon,
             },
             {
@@ -467,7 +504,7 @@ export default function PaymentsPage() {
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className={newIds.has(row.original.id) ? "bg-green-500/10 transition-colors duration-1000" : editedIds.has(row.original.id) ? "bg-blue-500/10 transition-colors duration-1000" : "transition-colors duration-1000"}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -507,6 +544,31 @@ export default function PaymentsPage() {
           </Pagination>
         </div>
       </div>
+
+      {/* Password Prompt */}
+      <Dialog open={!!passwordPromptRow} onOpenChange={(o) => { if (!o) { setPasswordPromptRow(null); setPasswordInput(""); setPasswordError(null); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Authentication Required</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handlePasswordSubmit(); }}
+                placeholder="Enter password…"
+                autoFocus
+              />
+            </div>
+            {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPasswordPromptRow(null); setPasswordInput(""); setPasswordError(null); }}>Cancel</Button>
+            <Button onClick={handlePasswordSubmit}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
@@ -565,6 +627,7 @@ export default function PaymentsPage() {
             <p className="text-xs text-destructive">{editError}</p>
           )}
           <DialogFooter>
+            <Button variant="destructive" className="mr-auto" onClick={() => { setDeleteRow(editRow); setEditRow(null); }}>Delete</Button>
             <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
             <Button onClick={handleUpdate}>Save</Button>
           </DialogFooter>
