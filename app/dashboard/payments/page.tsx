@@ -25,6 +25,7 @@ import {
   type ColumnDef,
   type ColumnFiltersState,
 } from "@tanstack/react-table";
+import { toast } from "sonner";
 
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -103,15 +104,30 @@ const emptyForm = {
   collector: "",
 };
 
+type PaymentForm = typeof emptyForm;
+type PaymentField = keyof PaymentForm;
+type FormErrors = Partial<Record<PaymentField, string>>;
+type DateRangeFilterValue = {
+  start: string;
+  end: string;
+};
+
+function toLocalDateString(value: string) {
+  const d = new Date(value);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
-  const [insertError, setInsertError] = useState<string | null>(null);
+  const [, setInsertError] = useState<string | null>(null);
+  const [, setInsertFieldErrors] = useState<FormErrors>({});
 
   const [editRow, setEditRow] = useState<Payment | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
-  const [editError, setEditError] = useState<string | null>(null);
+  const [, setEditError] = useState<string | null>(null);
+  const [, setEditFieldErrors] = useState<FormErrors>({});
   const [deleteRow, setDeleteRow] = useState<Payment | null>(null);
 
   const [passwordPromptRow, setPasswordPromptRow] = useState<Payment | null>(null);
@@ -124,6 +140,8 @@ export default function PaymentsPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [filterColumn, setFilterColumn] = useState<string>("");
   const [filterValue, setFilterValue] = useState<string>("");
+  const [, setDateRangeFilter] = useState<DateRangeFilterValue>({ start: "", end: "" });
+  const [pendingDateRangeFilter, setPendingDateRangeFilter] = useState<DateRangeFilterValue>({ start: "", end: "" });
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });
 
   useEffect(() => { fetchPayments(); }, []);
@@ -148,14 +166,75 @@ export default function PaymentsPage() {
     return String(s + p - 1);
   }
 
+  function validatePaymentForm(values: PaymentForm, ignoreId?: number): { summary: string | null; fieldErrors: FormErrors } {
+    const fieldErrors: FormErrors = {};
+
+    if (!values.or_date) fieldErrors.or_date = "Please choose an O.R. date.";
+    if (!values.or_no_start) fieldErrors.or_no_start = "Enter an O.R. start number.";
+    if (!values.pieces) fieldErrors.pieces = "Enter the number of pieces.";
+    if (!values.rcd_amount) fieldErrors.rcd_amount = "Enter the RCD amount.";
+    if (!values.collector) fieldErrors.collector = "Please select a collector.";
+
+    if (values.or_no_start && !/^\d+$/.test(values.or_no_start)) {
+      fieldErrors.or_no_start = "O.R. start number must contain digits only.";
+    }
+
+    if (values.or_no_end && !/^\d+$/.test(values.or_no_end)) {
+      fieldErrors.or_no_end = "O.R. end number is invalid.";
+    }
+
+    if (values.pieces && (!/^\d+$/.test(values.pieces) || Number(values.pieces) < 1)) {
+      fieldErrors.pieces = "Pieces must be a whole number greater than 0.";
+    }
+
+    if (values.rcd_amount && !/^\d+(\.\d{1,2})?$/.test(values.rcd_amount)) {
+      fieldErrors.rcd_amount = "Use a valid amount with up to 2 decimal places.";
+    }
+
+    const start = Number(values.or_no_start);
+    const end = Number(values.or_no_end);
+
+    if (values.or_no_start && values.or_no_end && (Number.isNaN(start) || Number.isNaN(end) || start > end)) {
+      fieldErrors.or_no_start = fieldErrors.or_no_start ?? "O.R. range is invalid.";
+      fieldErrors.or_no_end = fieldErrors.or_no_end ?? "O.R. range is invalid.";
+    }
+
+    if (!fieldErrors.or_no_start && !fieldErrors.or_no_end && values.or_no_start && values.or_no_end) {
+      const overlappingPayment = payments.find((payment) => {
+        if (ignoreId && payment.id === ignoreId) return false;
+
+        const existingStart = Number(payment.or_no_start);
+        const existingEnd = Number(payment.or_no_end);
+        if (Number.isNaN(existingStart) || Number.isNaN(existingEnd)) return false;
+
+        return existingStart <= end && existingEnd >= start;
+      });
+
+      if (overlappingPayment) {
+        const overlapMessage = `Overlaps with existing O.R. range ${overlappingPayment.or_no_start}-${overlappingPayment.or_no_end}.`;
+        fieldErrors.or_no_start = overlapMessage;
+        fieldErrors.or_no_end = overlapMessage;
+      }
+    }
+
+    const summary = Object.values(fieldErrors)[0] ?? null;
+    return { summary, fieldErrors };
+  }
+
   async function fetchPayments() {
     const res = await fetch("/api/payments");
     if (res.ok) setPayments(await res.json());
   }
 
   async function handleInsert() {
-    if (!form.or_date || !form.or_no_start || !form.or_no_end || !form.pieces || !form.rcd_amount || !form.collector)
+    const validation = validatePaymentForm(form);
+    if (validation.summary) {
+      setInsertFieldErrors(validation.fieldErrors);
+      setInsertError(validation.summary);
+      toast.error(validation.summary);
       return;
+    }
+    setInsertFieldErrors({});
     setInsertError(null);
     setLoading(true);
     const res = await fetch("/api/payments", {
@@ -167,19 +246,31 @@ export default function PaymentsPage() {
       const created: Payment = await res.json();
       setPayments((prev) => [created, ...prev]);
       setForm(emptyForm);
+      setInsertFieldErrors({});
+      toast.success("Payment record inserted.");
       setNewIds((prev) => new Set(prev).add(created.id));
       setTimeout(() => {
         setNewIds((prev) => { const next = new Set(prev); next.delete(created.id); return next; });
       }, 4000);
     } else {
       const data = await res.json();
-      setInsertError(data.error ?? "Failed to insert record.");
+      const message = data.error ?? "Failed to insert record.";
+      setInsertError(message);
+      toast.error(message);
     }
     setLoading(false);
   }
 
   async function handleUpdate() {
     if (!editRow) return;
+    const validation = validatePaymentForm(editForm, editRow.id);
+    if (validation.summary) {
+      setEditFieldErrors(validation.fieldErrors);
+      setEditError(validation.summary);
+      toast.error(validation.summary);
+      return;
+    }
+    setEditFieldErrors({});
     setEditError(null);
     const res = await fetch(`/api/payments/${editRow.id}`, {
       method: "PUT",
@@ -190,13 +281,17 @@ export default function PaymentsPage() {
       const updated: Payment = await res.json();
       setPayments((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setEditRow(null);
+      setEditFieldErrors({});
+      toast.success("Payment record updated.");
       setEditedIds((prev) => new Set(prev).add(updated.id));
       setTimeout(() => {
         setEditedIds((prev) => { const next = new Set(prev); next.delete(updated.id); return next; });
       }, 4000);
     } else {
       const data = await res.json();
-      setEditError(data.error ?? "Failed to update record.");
+      const message = data.error ?? "Failed to update record.";
+      setEditError(message);
+      toast.error(message);
     }
   }
 
@@ -216,7 +311,10 @@ export default function PaymentsPage() {
     const res = await fetch(`/api/payments/${deleteRow.id}`, { method: "DELETE" });
     if (res.ok) {
       setPayments((prev) => prev.filter((p) => p.id !== deleteRow.id));
+      toast.success("Payment record deleted.");
       setDeleteRow(null);
+    } else {
+      toast.error("Failed to delete record.");
     }
   }
 
@@ -225,10 +323,11 @@ export default function PaymentsPage() {
       {
         accessorKey: "or_date",
         header: "O.R. Date",
-        filterFn: (row, columnId, filterValue) => {
-          const d = new Date(String(row.getValue(columnId)));
-          const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          return local === filterValue;
+        filterFn: (row, columnId, filterValue: DateRangeFilterValue) => {
+          const local = toLocalDateString(String(row.getValue(columnId)));
+          if (filterValue?.start && local < filterValue.start) return false;
+          if (filterValue?.end && local > filterValue.end) return false;
+          return true;
         },
         cell: ({ getValue }) =>
           format(new Date(String(getValue())), "MM/dd/yyyy"),
@@ -284,10 +383,22 @@ export default function PaymentsPage() {
     { id: "or_date",     label: "O.R. Date",      type: "date"   },
     { id: "or_no_start", label: "O.R. No. Start", type: "text"   },
     { id: "or_no_end",   label: "O.R. No. End",   type: "text"   },
-    { id: "pieces",      label: "Pieces",          type: "text"   },
   ];
 
-  function applyFilter(col: string, val: string) {
+  function applyFilter(col: string, val: string | DateRangeFilterValue) {
+    if (col === "or_date" && typeof val !== "string") {
+      setDateRangeFilter(val);
+      const hasDateRange = Boolean(val.start || val.end);
+      setColumnFilters(
+        hasDateRange
+          ? [...columnFilters.filter((f) => f.id !== col), { id: col, value: val }]
+          : columnFilters.filter((f) => f.id !== col)
+      );
+      return;
+    }
+
+    if (typeof val !== "string") return;
+
     setFilterValue(val);
     setColumnFilters(
       val === "" || val === "all"
@@ -299,7 +410,13 @@ export default function PaymentsPage() {
   function handleFilterColumnChange(col: string) {
     setFilterColumn(col);
     setFilterValue("");
+    setDateRangeFilter({ start: "", end: "" });
+    setPendingDateRangeFilter({ start: "", end: "" });
     setColumnFilters(columnFilters.filter((f) => f.id !== filterColumn));
+  }
+
+  function handleDateRangeSearch() {
+    applyFilter("or_date", pendingDateRangeFilter);
   }
 
   return (
@@ -418,9 +535,6 @@ export default function PaymentsPage() {
           <Button onClick={handleInsert} disabled={loading}>
             {loading ? "Inserting…" : "INSERT"}
           </Button>
-          {insertError && (
-            <p className="w-full text-xs text-destructive pt-1">{insertError}</p>
-          )}
         </div>
 
         {/* Filter Row */}
@@ -441,6 +555,48 @@ export default function PaymentsPage() {
 
           {filterColumn && (() => {
             const col = FILTER_COLUMNS.find((c) => c.id === filterColumn)!;
+            if (col.id === "or_date") {
+              return (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      className="w-44"
+                      value={pendingDateRangeFilter.start}
+                      onChange={(e) =>
+                        setPendingDateRangeFilter((prev) => ({
+                          ...prev,
+                          start: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      className="w-44"
+                      value={pendingDateRangeFilter.end}
+                      onChange={(e) =>
+                        setPendingDateRangeFilter((prev) => ({
+                          ...prev,
+                          end: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="self-end"
+                    onClick={handleDateRangeSearch}
+                  >
+                    Search
+                  </Button>
+                </>
+              );
+            }
             if (col.type === "select") {
               return (
                 <div className="flex flex-col gap-1">
@@ -475,6 +631,8 @@ export default function PaymentsPage() {
             <Button variant="ghost" size="sm" onClick={() => {
               setFilterColumn("");
               setFilterValue("");
+              setDateRangeFilter({ start: "", end: "" });
+              setPendingDateRangeFilter({ start: "", end: "" });
               setColumnFilters([]);
             }}>
               Clear
@@ -623,9 +781,6 @@ export default function PaymentsPage() {
               </Select>
             </div>
           </div>
-          {editError && (
-            <p className="text-xs text-destructive">{editError}</p>
-          )}
           <DialogFooter>
             <Button variant="destructive" className="mr-auto" onClick={() => { setDeleteRow(editRow); setEditRow(null); }}>Delete</Button>
             <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
