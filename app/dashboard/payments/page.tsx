@@ -73,12 +73,13 @@ import {
 } from "@/components/ui/pagination";
 
 const COLLECTORS = [
-  "Julio De Guzman",
-  "Lacel Centeno",
-  "Ivy Callope",
-  "Carla Buganan",
-  "Baby Jane De Jesus",
-  "Rizza Rovira",
+  "Juan Dela Cruz",
+  "Maria Clara",
+  "Joebert Joe",
+  "Charlie Smith",
+  "Bob Santos",
+  "Alice Reyes",
+  
 ];
 
 const PAGE_SIZE = 10;

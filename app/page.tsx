@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -17,7 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 export default function SignInPage() {
-  const router = useRouter(); 
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -36,7 +37,8 @@ export default function SignInPage() {
     if (error) {
       setError(error.message ?? "Sign in failed");
     } else {
-      router.push("/dashboard");
+      window.sessionStorage.setItem("auth-flash", "login-success");
+      router.push(searchParams.get("redirect") ?? "/dashboard");
     }
 
     setLoading(false);

@@ -39,6 +39,7 @@ export function AppSidebar() {
 
   async function handleSignOut() {
     await authClient.signOut();
+    window.sessionStorage.setItem("auth-flash", "logout-success");
     router.push("/");
   }
 
