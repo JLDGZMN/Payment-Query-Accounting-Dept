@@ -113,6 +113,10 @@ type DateRangeFilterValue = {
   end: string;
 };
 
+function sanitizeDigits(value: string, maxLength = 7) {
+  return value.replace(/[^0-9]/g, "").slice(0, maxLength);
+}
+
 function toLocalDateString(value: string) {
   const d = new Date(value);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -499,7 +503,7 @@ export default function PaymentsPage() {
             <Input type="text" inputMode="numeric" className="w-28" value={form.or_no_start}
               maxLength={7}
               onChange={(e) => {
-                const start = e.target.value.replace(/[^0-9]/g, "").slice(0, 7);
+                const start = sanitizeDigits(e.target.value);
                 setInsertError(null);
                 setForm((f) => ({ ...f, or_no_start: start, or_no_end: computeEnd(start, f.pieces) }));
               }} />
@@ -618,11 +622,20 @@ export default function PaymentsPage() {
               <div className="flex flex-col gap-1">
                 <Label>{col.label}</Label>
                 <Input
-                  type={col.type}
+                  type={col.id === "or_no_start" || col.id === "or_no_end" ? "text" : col.type}
+                  inputMode={col.id === "or_no_start" || col.id === "or_no_end" ? "numeric" : undefined}
+                  maxLength={col.id === "or_no_start" || col.id === "or_no_end" ? 7 : undefined}
                   className="w-44"
                   value={filterValue}
                   placeholder={`Search ${col.label}…`}
-                  onChange={(e) => applyFilter(filterColumn, e.target.value)}
+                  onChange={(e) =>
+                    applyFilter(
+                      filterColumn,
+                      col.id === "or_no_start" || col.id === "or_no_end"
+                        ? sanitizeDigits(e.target.value)
+                        : e.target.value
+                    )
+                  }
                 />
               </div>
             );
@@ -744,7 +757,7 @@ export default function PaymentsPage() {
                 <Label>O.R. No. - Start</Label>
                 <Input type="text" inputMode="numeric" maxLength={7} value={editForm.or_no_start}
                   onChange={(e) => {
-                    const start = e.target.value.replace(/[^0-9]/g, "").slice(0, 7);
+                    const start = sanitizeDigits(e.target.value);
                     setEditError(null);
                     setEditForm((f) => ({ ...f, or_no_start: start, or_no_end: computeEnd(start, f.pieces) }));
                   }} />
