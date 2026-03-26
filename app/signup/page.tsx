@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { AuthBackground } from "@/components/auth-background";
 import {
   Card,
   CardContent,
@@ -48,15 +49,22 @@ export default function SignUpPage() {
       setError(error.message ?? "Sign up failed.");
     } else {
       await authClient.signOut();
-      router.push("/");
+      const params = new URLSearchParams({ signup: "success" });
+      const trimmedUsername = username.trim();
+
+      if (trimmedUsername) {
+        params.set("username", trimmedUsername);
+      }
+
+      router.push(`/?${params.toString()}`);
     }
 
     setLoading(false);
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
+    <AuthBackground>
+      <Card className="w-full max-w-sm border-white/20 bg-background/88 shadow-2xl backdrop-blur-md supports-[backdrop-filter]:bg-background/80 dark:border-white/10 dark:bg-slate-950/75">
         <CardHeader>
           <CardTitle>Sign Up</CardTitle>
           <CardDescription>Create a new account to get started.</CardDescription>
@@ -137,6 +145,6 @@ export default function SignUpPage() {
           </CardFooter>
         </form>
       </Card>
-    </div>
+    </AuthBackground>
   );
 }

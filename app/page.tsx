@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { AuthBackground } from "@/components/auth-background";
 import {
   Card,
   CardContent,
@@ -16,6 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+const AUTH_FLASH_KEY = "auth-flash";
+const AUTH_FLASH_USERNAME_KEY = "auth-flash-username";
+
 export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +27,12 @@ export default function SignInPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const signupSuccessMessage =
+    searchParams.get("signup") === "success"
+      ? searchParams.get("username")?.trim()
+        ? `Account created successfully! You can sign in now.`
+        : "Account created successfully. You can sign in now."
+      : "";
 
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
@@ -37,7 +47,11 @@ export default function SignInPage() {
     if (error) {
       setError(error.message ?? "Sign in failed");
     } else {
-      window.sessionStorage.setItem("auth-flash", "login-success");
+      window.sessionStorage.setItem(AUTH_FLASH_KEY, "login-success");
+      window.sessionStorage.setItem(
+        AUTH_FLASH_USERNAME_KEY,
+        username.trim()
+      );
       router.push(searchParams.get("redirect") ?? "/dashboard");
     }
 
@@ -45,8 +59,8 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
+    <AuthBackground>
+      <Card className="w-full max-w-sm border-white/20 bg-background/88 shadow-2xl backdrop-blur-md supports-[backdrop-filter]:bg-background/80 dark:border-white/10 dark:bg-slate-950/75">
         <CardHeader>
           <CardTitle>Sign In</CardTitle>
           <CardDescription>
@@ -56,6 +70,12 @@ export default function SignInPage() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="flex flex-col gap-3">
+            {signupSuccessMessage && (
+              <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+                {signupSuccessMessage}
+              </p>
+            )}
+
             <div className="flex flex-col gap-1">
               <Label htmlFor="username">Username</Label>
               <Input
@@ -93,6 +113,6 @@ export default function SignInPage() {
           </CardFooter>
         </form>
       </Card>
-    </div>
+    </AuthBackground>
   );
 }

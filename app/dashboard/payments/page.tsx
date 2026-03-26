@@ -316,7 +316,7 @@ export default function PaymentsPage() {
     const res = await fetch(`/api/payments/${deleteRow.id}`, { method: "DELETE" });
     if (res.ok) {
       setPayments((prev) => prev.filter((p) => p.id !== deleteRow.id));
-      toast.success("Payment record deleted.");
+      toast.warning("Payment record deleted.");
       setDeleteRow(null);
     } else {
       toast.error("Failed to delete record.");

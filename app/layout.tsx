@@ -34,7 +34,7 @@ export default function RootLayout({
         <TooltipProvider>
           <AuthFlashToast />
           {children}
-          <Toaster richColors position="top-right" />
+          <Toaster position="top-right" />
         </TooltipProvider>
       </body>
     </html>
