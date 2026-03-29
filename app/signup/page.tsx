@@ -17,6 +17,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+const authCardClass =
+  "w-full max-w-sm rounded-3xl border border-border/60 bg-background/92 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88 dark:border-white/10 dark:bg-slate-950/82 dark:shadow-black/40";
+const authInputClass =
+  "h-10 rounded-xl border-border/60 bg-background/70 px-3 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-border focus-visible:border-ring/80 focus-visible:ring-[3px] focus-visible:ring-ring/15";
+const authPrimaryButtonClass =
+  "h-10 rounded-xl shadow-sm transition-[transform,box-shadow,background-color] duration-200 hover:shadow-md";
+const authGhostButtonClass =
+  "h-10 rounded-xl border border-transparent transition-[background-color,border-color,color] duration-200 hover:border-border/40 hover:bg-muted/60";
+
 export default function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -64,82 +73,101 @@ export default function SignUpPage() {
 
   return (
     <AuthBackground>
-      <Card className="w-full max-w-sm border-white/20 bg-background/88 shadow-2xl backdrop-blur-md supports-[backdrop-filter]:bg-background/80 dark:border-white/10 dark:bg-slate-950/75">
-        <CardHeader>
-          <CardTitle>Sign Up</CardTitle>
-          <CardDescription>Create a new account to get started.</CardDescription>
+      <Card className={authCardClass}>
+        <CardHeader className="gap-1.5 px-6 pt-6 pb-1">
+          <CardTitle className="text-xl font-semibold tracking-tight">Sign Up</CardTitle>
+          <CardDescription className="text-sm leading-relaxed">Create a new account to get started.</CardDescription>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="name">Full Name</Label>
+          <CardContent className="flex flex-col gap-4 px-6 py-5">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="name" className="text-xs font-medium text-foreground/90">
+                Full Name
+              </Label>
               <Input
                 id="name"
                 type="text"
                 placeholder="Juan Dela Cruz"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className={authInputClass}
                 required
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="email">Email</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="email" className="text-xs font-medium text-foreground/90">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="you@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className={authInputClass}
                 required
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="username">Username</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="username" className="text-xs font-medium text-foreground/90">
+                Username
+              </Label>
               <Input
                 id="username"
                 type="text"
                 placeholder="Enter your username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                className={authInputClass}
                 required
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="password">Password</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password" className="text-xs font-medium text-foreground/90">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className={authInputClass}
                 required
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="confirmPassword" className="text-xs font-medium text-foreground/90">
+                Confirm Password
+              </Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                className={authInputClass}
                 required
               />
             </div>
 
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && (
+              <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-destructive">
+                {error}
+              </p>
+            )}
           </CardContent>
 
-          <CardFooter className="flex flex-col gap-2 border-t-0 pt-0 px-4 pb-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+          <CardFooter className="flex flex-col gap-3 border-t border-border/50 px-6 pt-4 pb-6">
+            <Button type="submit" className={`w-full ${authPrimaryButtonClass}`} disabled={loading}>
               {loading ? "Please wait..." : "Create Account"}
             </Button>
-            <Button type="button" variant="ghost" className="w-full" asChild>
+            <Button type="button" variant="ghost" className={`w-full ${authGhostButtonClass}`} asChild>
               <Link href="/">Already have an account? Sign In</Link>
             </Button>
           </CardFooter>

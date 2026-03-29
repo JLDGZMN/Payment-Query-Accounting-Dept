@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CheckCircleIcon,
   EyeIcon,
@@ -62,7 +63,31 @@ function getPasswordStrength(password: string) {
   return { label: "Strong", tone: "text-green-600" };
 }
 
+const dashboardCardClass =
+  "rounded-3xl border border-border/60 bg-background/92 shadow-[0_20px_45px_-28px_rgba(15,23,42,0.3)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88";
+const dashboardHeroCardClass =
+  "overflow-hidden rounded-3xl border border-border/60 bg-background/92 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.32)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88";
+const dashboardInputClass =
+  "rounded-xl border-border/60 bg-background/75 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-border focus-visible:border-ring/80 focus-visible:ring-[3px] focus-visible:ring-ring/15";
+const dashboardReadOnlyInputClass =
+  "rounded-xl border-border/50 bg-muted/55 shadow-sm";
+const dashboardPrimaryButtonClass =
+  "rounded-xl shadow-sm transition-[transform,box-shadow,background-color,border-color] duration-200 hover:shadow-md";
+const dashboardDestructiveButtonClass =
+  "rounded-xl shadow-sm transition-[transform,box-shadow,background-color,border-color] duration-200 hover:shadow-md";
+const dashboardIconButtonClass =
+  "absolute inset-y-0 right-2 my-auto flex size-8 items-center justify-center rounded-xl text-muted-foreground transition-[background-color,color,box-shadow] duration-200 hover:bg-muted/60 hover:text-foreground hover:shadow-sm";
+const dashboardBadgeClass =
+  "rounded-full border border-border/60 bg-background/75 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm";
+const dashboardMutedPanelClass =
+  "rounded-2xl border border-border/60 bg-muted/30 shadow-sm";
+const dashboardErrorClass =
+  "rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-sm leading-relaxed text-destructive";
+const dashboardSuccessClass =
+  "rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3.5 py-3 text-sm leading-relaxed text-emerald-800 shadow-sm dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-100";
+
 export default function ProfilePage() {
+  const router = useRouter();
   const { data: session, isPending } = useSession();
   const [name, setName] = useState("");
   const [nameLoading, setNameLoading] = useState(false);
@@ -78,6 +103,7 @@ export default function ProfilePage() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
   const [pwError, setPwError] = useState("");
+  const [signOutLoading, setSignOutLoading] = useState(false);
 
   const currentName = session?.user?.name ?? "";
   const currentEmail = session?.user?.email ?? "";
@@ -93,7 +119,7 @@ export default function ProfilePage() {
   if (isPending) {
     return (
       <SidebarInset>
-        <header className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
           <span className="text-xs font-medium text-muted-foreground">Profile</span>
         </header>
         <div className="flex items-center justify-center p-8">
@@ -168,20 +194,27 @@ export default function ProfilePage() {
     setPwLoading(false);
   }
 
+  async function handleSignOut() {
+    setSignOutLoading(true);
+    await authClient.signOut();
+    window.sessionStorage.setItem("auth-flash", "logout-success");
+    router.push("/");
+  }
+
   return (
     <SidebarInset>
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
         <SidebarTrigger className="-ml-1 md:hidden" />
         <Separator orientation="vertical" className="mr-2 h-4 md:hidden" />
         <span className="text-xs font-medium text-muted-foreground">Profile</span>
       </header>
 
       <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
-        <Card className="overflow-hidden border-border/70 bg-gradient-to-r from-card via-card to-muted/30">
+        <Card className={dashboardHeroCardClass}>
           <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <Avatar size="lg" className="size-14">
-                <AvatarFallback className="bg-primary/10 font-semibold text-primary">
+                <AvatarFallback className="rounded-2xl bg-primary/10 font-semibold text-primary">
                   {getInitials(currentName || username || currentEmail)}
                 </AvatarFallback>
               </Avatar>
@@ -190,7 +223,7 @@ export default function ProfilePage() {
                   <h1 className="text-2xl font-semibold tracking-tight">
                     {currentName || "Your profile"}
                   </h1>
-                  <Badge variant="outline">Account settings</Badge>
+                  <Badge variant="outline" className={dashboardBadgeClass}>Account settings</Badge>
                 </div>
                 <p className="max-w-2xl text-sm text-muted-foreground">
                   Review your account details, update how your name appears, and keep your
@@ -198,46 +231,55 @@ export default function ProfilePage() {
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-sm shadow-sm">
+            <div className={`px-4 py-3 text-sm ${dashboardMutedPanelClass}`}>
               <p className="font-medium">Signed in as</p>
               <p className="text-muted-foreground">{currentEmail || "No email available"}</p>
+              <Button
+                type="button"
+                variant="destructive"
+                className={`mt-3 w-full ${dashboardDestructiveButtonClass}`}
+                onClick={handleSignOut}
+                disabled={signOutLoading}
+              >
+                {signOutLoading ? "Signing out..." : "Sign Out"}
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="border-b">
-            <CardTitle>Profile details</CardTitle>
-            <CardDescription>Your current account information at a glance.</CardDescription>
+        <Card className={dashboardCardClass}>
+          <CardHeader className="gap-1.5 border-b border-border/50 px-6 pt-6 pb-4">
+            <CardTitle className="text-lg font-semibold tracking-tight">Profile details</CardTitle>
+            <CardDescription className="text-sm leading-relaxed">Your current account information at a glance.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 pt-6 md:grid-cols-3">
+          <CardContent className="grid gap-4 px-6 py-6 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>Full name</Label>
-              <Input value={currentName} readOnly className="bg-muted/60" />
+              <Label className="text-xs font-medium text-foreground/90">Full name</Label>
+              <Input value={currentName} readOnly className={dashboardReadOnlyInputClass} />
             </div>
             <div className="space-y-2">
-              <Label>Username</Label>
-              <Input value={username} readOnly className="bg-muted/60" />
+              <Label className="text-xs font-medium text-foreground/90">Username</Label>
+              <Input value={username} readOnly className={dashboardReadOnlyInputClass} />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={currentEmail} readOnly className="bg-muted/60" />
+              <Label className="text-xs font-medium text-foreground/90">Email</Label>
+              <Input value={currentEmail} readOnly className={dashboardReadOnlyInputClass} />
             </div>
           </CardContent>
         </Card>
 
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card className="h-full">
+          <Card className={`h-full ${dashboardCardClass}`}>
             <form onSubmit={handleUpdateName}>
-              <CardHeader className="border-b">
-                <CardTitle>Update display name</CardTitle>
-                <CardDescription>
+              <CardHeader className="gap-1.5 border-b border-border/50 px-6 pt-6 pb-4">
+                <CardTitle className="text-lg font-semibold tracking-tight">Update display name</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
                   This is the name shown across the dashboard and account menus.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
+              <CardContent className="space-y-4 px-6 py-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Display name</Label>
+                  <Label htmlFor="name" className="text-xs font-medium text-foreground/90">Display name</Label>
                   <Input
                     id="name"
                     type="text"
@@ -249,22 +291,23 @@ export default function ProfilePage() {
                     }}
                     disabled={nameLoading}
                     required
+                    className={dashboardInputClass}
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Keep it recognizable so teammates and accounting staff can identify your
                   requests quickly.
                 </p>
-                {nameError ? <p className="text-sm text-destructive">{nameError}</p> : null}
+                {nameError ? <p className={dashboardErrorClass}>{nameError}</p> : null}
                 {nameSuccess ? (
-                  <p className="flex items-center gap-2 text-sm text-green-600">
+                  <p className={`flex items-center gap-2 ${dashboardSuccessClass}`}>
                     <CheckCircleIcon size={16} />
                     Name updated successfully.
                   </p>
                 ) : null}
               </CardContent>
-              <CardFooter className="border-t pt-4">
-                <Button type="submit" className="w-full sm:w-auto" disabled={nameLoading || !nameChanged}>
+              <CardFooter className="border-t border-border/50 px-6 pt-4 pb-6">
+                <Button type="submit" className={`w-full sm:w-auto ${dashboardPrimaryButtonClass}`} disabled={nameLoading || !nameChanged}>
                   {nameLoading ? (
                     <span className="flex items-center gap-2">
                       <Spinner className="size-4" />
@@ -278,24 +321,24 @@ export default function ProfilePage() {
             </form>
           </Card>
 
-          <Card className="h-full border-border/70">
+          <Card className={`h-full ${dashboardCardClass}`}>
             <form onSubmit={handleChangePassword}>
-              <CardHeader className="border-b">
+              <CardHeader className="gap-1.5 border-b border-border/50 px-6 pt-6 pb-4">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <CardTitle>Security</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg font-semibold tracking-tight">Security</CardTitle>
+                    <CardDescription className="mt-1 text-sm leading-relaxed">
                       Change your password and protect your account sessions.
                     </CardDescription>
                   </div>
-                  <div className="rounded-full bg-primary/10 p-2 text-primary">
+                  <div className="flex size-10 items-center justify-center rounded-2xl border border-border/50 bg-background/75 text-primary shadow-sm">
                     <ShieldCheckIcon size={18} weight="fill" />
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
+              <CardContent className="space-y-4 px-6 py-6">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current password</Label>
+                  <Label htmlFor="currentPassword" className="text-xs font-medium text-foreground/90">Current password</Label>
                   <div className="relative">
                     <Input
                       id="currentPassword"
@@ -305,12 +348,12 @@ export default function ProfilePage() {
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       disabled={pwLoading}
                       required
-                      className="pr-12"
+                      className={`${dashboardInputClass} pr-12`}
                     />
                     <button
                       type="button"
                       aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
-                      className="absolute inset-y-0 right-3 flex items-center text-muted-foreground"
+                      className={dashboardIconButtonClass}
                       onClick={() => setShowCurrentPassword((value) => !value)}
                     >
                       {showCurrentPassword ? <EyeSlashIcon size={18} /> : <EyeIcon size={18} />}
@@ -320,7 +363,7 @@ export default function ProfilePage() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="newPassword">New password</Label>
+                    <Label htmlFor="newPassword" className="text-xs font-medium text-foreground/90">New password</Label>
                     <span className={`text-xs font-medium ${passwordStrength.tone}`}>
                       {passwordStrength.label}
                     </span>
@@ -338,12 +381,12 @@ export default function ProfilePage() {
                       }}
                       disabled={pwLoading}
                       required
-                      className="pr-12"
+                      className={`${dashboardInputClass} pr-12`}
                     />
                     <button
                       type="button"
                       aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                      className="absolute inset-y-0 right-3 flex items-center text-muted-foreground"
+                      className={dashboardIconButtonClass}
                       onClick={() => setShowNewPassword((value) => !value)}
                     >
                       {showNewPassword ? <EyeSlashIcon size={18} /> : <EyeIcon size={18} />}
@@ -355,7 +398,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm new password</Label>
+                  <Label htmlFor="confirmPassword" className="text-xs font-medium text-foreground/90">Confirm new password</Label>
                   <div className="relative">
                     <Input
                       id="confirmPassword"
@@ -369,12 +412,12 @@ export default function ProfilePage() {
                       }}
                       disabled={pwLoading}
                       required
-                      className="pr-12"
+                      className={`${dashboardInputClass} pr-12`}
                     />
                     <button
                       type="button"
                       aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
-                      className="absolute inset-y-0 right-3 flex items-center text-muted-foreground"
+                      className={dashboardIconButtonClass}
                       onClick={() => setShowConfirmPassword((value) => !value)}
                     >
                       {showConfirmPassword ? <EyeSlashIcon size={18} /> : <EyeIcon size={18} />}
@@ -387,28 +430,28 @@ export default function ProfilePage() {
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
+                <div className={`p-4 text-sm text-muted-foreground ${dashboardMutedPanelClass}`}>
                   Changing your password will sign out your other active sessions for extra
                   protection.
                 </div>
 
                 {pwError ? (
-                  <p className="flex items-center gap-2 text-sm text-destructive">
+                  <p className={`flex items-center gap-2 ${dashboardErrorClass}`}>
                     <WarningCircleIcon size={16} />
                     {pwError}
                   </p>
                 ) : null}
                 {pwSuccess ? (
-                  <p className="flex items-center gap-2 text-sm text-green-600">
+                  <p className={`flex items-center gap-2 ${dashboardSuccessClass}`}>
                     <CheckCircleIcon size={16} />
                     Password changed successfully.
                   </p>
                 ) : null}
               </CardContent>
-              <CardFooter className="border-t pt-4">
+              <CardFooter className="border-t border-border/50 px-6 pt-4 pb-6">
                 <Button
                   type="submit"
-                  className="w-full sm:w-auto"
+                  className={`w-full sm:w-auto ${dashboardPrimaryButtonClass}`}
                   disabled={pwLoading || !currentPassword || !newPassword || !confirmPassword}
                 >
                   {pwLoading ? (

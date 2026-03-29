@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   PencilSimpleIcon,
@@ -113,6 +113,27 @@ type DateRangeFilterValue = {
   end: string;
 };
 
+const dashboardCardClass =
+  "rounded-3xl border border-border/60 bg-background/92 shadow-[0_20px_45px_-28px_rgba(15,23,42,0.3)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88";
+const dashboardPanelClass =
+  "rounded-3xl border border-border/60 bg-background/92 p-4 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.28)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/88";
+const dashboardInputClass =
+  "rounded-xl border-border/60 bg-background/75 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-border focus-visible:border-ring/80 focus-visible:ring-[3px] focus-visible:ring-ring/15";
+const dashboardReadOnlyInputClass =
+  "rounded-xl border-border/50 bg-muted/55 shadow-sm";
+const dashboardSelectTriggerClass =
+  "rounded-xl border-border/60 bg-background/75 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-border focus-visible:border-ring/80 focus-visible:ring-[3px] focus-visible:ring-ring/15";
+const dashboardPrimaryButtonClass =
+  "rounded-xl shadow-sm transition-[transform,box-shadow,background-color,border-color] duration-200 hover:shadow-md";
+const dashboardGhostButtonClass =
+  "rounded-xl border border-transparent transition-[background-color,border-color,color] duration-200 hover:border-border/40 hover:bg-muted/60";
+const dashboardIconButtonClass =
+  "rounded-xl border border-transparent transition-[background-color,border-color,box-shadow] duration-200 hover:border-border/40 hover:bg-muted/60 hover:shadow-sm";
+const dashboardDialogClass =
+  "rounded-3xl border border-border/60 bg-background/95 p-6 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/90";
+const dashboardTableShellClass =
+  "overflow-hidden rounded-3xl border border-border/60 bg-background/94 shadow-[0_22px_50px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/90";
+
 function sanitizeDigits(value: string, maxLength = 7) {
   return value.replace(/[^0-9]/g, "").slice(0, maxLength);
 }
@@ -148,8 +169,41 @@ export default function PaymentsPage() {
   const [, setDateRangeFilter] = useState<DateRangeFilterValue>({ start: "", end: "" });
   const [pendingDateRangeFilter, setPendingDateRangeFilter] = useState<DateRangeFilterValue>({ start: "", end: "" });
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: PAGE_SIZE });
+  const tableWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [lockedColumnWidths, setLockedColumnWidths] = useState<Partial<Record<string, string>>>({});
 
   useEffect(() => { fetchPayments(); }, []);
+
+  useLayoutEffect(() => {
+    if (payments.length === 0 || Object.keys(lockedColumnWidths).length > 0) return;
+
+    let frame = 0;
+
+    frame = requestAnimationFrame(() => {
+      const tableElement = tableWrapperRef.current?.querySelector("table");
+      if (!tableElement) return;
+
+      const headerCells = tableElement.querySelectorAll<HTMLTableCellElement>("thead th[data-column-id]");
+      const tableWidth = tableElement.getBoundingClientRect().width;
+
+      if (!headerCells.length || tableWidth === 0) return;
+
+      const nextWidths: Partial<Record<string, string>> = {};
+
+      headerCells.forEach((cell) => {
+        const columnId = cell.dataset.columnId;
+        if (!columnId) return;
+
+        nextWidths[columnId] = `${(cell.getBoundingClientRect().width / tableWidth) * 100}%`;
+      });
+
+      if (Object.keys(nextWidths).length > 0) {
+        setLockedColumnWidths(nextWidths);
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [lockedColumnWidths, payments.length]);
 
   useEffect(() => {
     if (editRow) {
@@ -361,7 +415,7 @@ export default function PaymentsPage() {
               setPasswordPromptRow(row.original);
               setPasswordInput("");
               setPasswordError(null);
-            }}>
+            }} className={dashboardIconButtonClass}>
               <PencilSimpleIcon />
             </Button>
           </div>
@@ -426,13 +480,13 @@ export default function PaymentsPage() {
 
   return (
     <SidebarInset>
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b px-4">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
         <SidebarTrigger className="-ml-1 md:hidden" />
         <Separator orientation="vertical" className="mr-2 h-4 md:hidden" />
         <span className="text-xs font-medium text-muted-foreground">Payments</span>
       </header>
 
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 p-4 pb-4">
 
         {/* Stats */}
         {(() => {
@@ -477,18 +531,22 @@ export default function PaymentsPage() {
           return (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {stats.map((stat) => (
-                <Card key={stat.label}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardDescription>{stat.label}</CardDescription>
-                      <stat.icon className="size-4 text-muted-foreground" />
+                <Card key={stat.label} className={dashboardCardClass}>
+                  <CardHeader className="gap-3 px-5 pt-5 pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardDescription className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">
+                        {stat.label}
+                      </CardDescription>
+                      <div className="flex size-9 items-center justify-center rounded-2xl border border-border/50 bg-background/75 shadow-sm">
+                        <stat.icon className="size-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    <CardTitle className="text-2xl font-semibold tabular-nums">
+                    <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
                       {stat.value}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-xs text-muted-foreground">{stat.description}</p>
+                  <CardContent className="px-5 pb-5 pt-0">
+                    <p className="text-xs leading-relaxed text-muted-foreground">{stat.description}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -497,10 +555,10 @@ export default function PaymentsPage() {
         })()}
 
         {/* Insert Form Bar */}
-        <div className="flex flex-wrap items-end gap-2 border-b pb-4">
+        <div className={`flex flex-wrap items-end gap-3 ${dashboardPanelClass}`}>
           <div className="flex flex-col gap-1">
-            <Label>O.R. No. - Start</Label>
-            <Input type="text" inputMode="numeric" className="w-28" value={form.or_no_start}
+            <Label className="text-xs font-medium text-foreground/90">O.R. No. - Start</Label>
+            <Input type="text" inputMode="numeric" className={`w-28 ${dashboardInputClass}`} value={form.or_no_start}
               maxLength={7}
               onChange={(e) => {
                 const start = sanitizeDigits(e.target.value);
@@ -509,45 +567,45 @@ export default function PaymentsPage() {
               }} />
           </div>
           <div className="flex flex-col gap-1">
-            <Label>O.R. No. - End</Label>
-            <Input type="number" className="w-28 bg-muted" value={form.or_no_end} readOnly />
+            <Label className="text-xs font-medium text-foreground/90">O.R. No. - End</Label>
+            <Input type="number" className={`w-28 ${dashboardReadOnlyInputClass}`} value={form.or_no_end} readOnly />
           </div>
           <div className="flex flex-col gap-1">
-            <Label>No. of Pieces</Label>
-            <Input type="number" min="1" className="w-24" value={form.pieces}
+            <Label className="text-xs font-medium text-foreground/90">No. of Pieces</Label>
+            <Input type="number" min="1" className={`w-24 ${dashboardInputClass}`} value={form.pieces}
               onChange={(e) => {
                 const pieces = e.target.value;
                 setForm((f) => ({ ...f, pieces, or_no_end: computeEnd(f.or_no_start, pieces) }));
               }} />
           </div>
           <div className="flex flex-col gap-1">
-            <Label>RCD Amount</Label>
-            <Input type="text" inputMode="decimal" className="w-32" value={form.rcd_amount}
+            <Label className="text-xs font-medium text-foreground/90">RCD Amount</Label>
+            <Input type="text" inputMode="decimal" className={`w-32 ${dashboardInputClass}`} value={form.rcd_amount}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*/g, "$1");
                 setForm((f) => ({ ...f, rcd_amount: val }));
               }} />
           </div>
           <div className="flex flex-col gap-1">
-            <Label>Collector</Label>
+            <Label className="text-xs font-medium text-foreground/90">Collector</Label>
             <Select value={form.collector} onValueChange={(v) => setForm((f) => ({ ...f, collector: v }))}>
-              <SelectTrigger className="w-44"><SelectValue placeholder="Select…" /></SelectTrigger>
+              <SelectTrigger className={`w-44 ${dashboardSelectTriggerClass}`}><SelectValue placeholder="Select…" /></SelectTrigger>
               <SelectContent>
                 {COLLECTORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleInsert} disabled={loading}>
+          <Button onClick={handleInsert} className={dashboardPrimaryButtonClass} disabled={loading}>
             {loading ? "Inserting…" : "INSERT"}
           </Button>
         </div>
 
         {/* Filter Row */}
-        <div className="flex flex-wrap items-end gap-2">
+        <div className={`flex flex-wrap items-end gap-3 ${dashboardPanelClass}`}>
           <div className="flex flex-col gap-1">
-            <Label>Filter by</Label>
+            <Label className="text-xs font-medium text-foreground/90">Filter by</Label>
             <Select value={filterColumn} onValueChange={handleFilterColumnChange}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className={`w-44 ${dashboardSelectTriggerClass}`}>
                 <SelectValue placeholder="Select column…" />
               </SelectTrigger>
               <SelectContent>
@@ -564,10 +622,10 @@ export default function PaymentsPage() {
               return (
                 <>
                   <div className="flex flex-col gap-1">
-                    <Label>Start Date</Label>
+                    <Label className="text-xs font-medium text-foreground/90">Start Date</Label>
                     <Input
                       type="date"
-                      className="w-44"
+                      className={`w-44 ${dashboardInputClass}`}
                       value={pendingDateRangeFilter.start}
                       onChange={(e) =>
                         setPendingDateRangeFilter((prev) => ({
@@ -578,10 +636,10 @@ export default function PaymentsPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label>End Date</Label>
+                    <Label className="text-xs font-medium text-foreground/90">End Date</Label>
                     <Input
                       type="date"
-                      className="w-44"
+                      className={`w-44 ${dashboardInputClass}`}
                       value={pendingDateRangeFilter.end}
                       onChange={(e) =>
                         setPendingDateRangeFilter((prev) => ({
@@ -594,7 +652,7 @@ export default function PaymentsPage() {
                   <Button
                     type="button"
                     size="sm"
-                    className="self-end"
+                    className={`self-end ${dashboardPrimaryButtonClass}`}
                     onClick={handleDateRangeSearch}
                   >
                     Search
@@ -605,9 +663,9 @@ export default function PaymentsPage() {
             if (col.type === "select") {
               return (
                 <div className="flex flex-col gap-1">
-                  <Label>{col.label}</Label>
+                  <Label className="text-xs font-medium text-foreground/90">{col.label}</Label>
                   <Select value={filterValue || "all"} onValueChange={(v) => applyFilter(filterColumn, v)}>
-                    <SelectTrigger className="w-44">
+                    <SelectTrigger className={`w-44 ${dashboardSelectTriggerClass}`}>
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
@@ -620,12 +678,12 @@ export default function PaymentsPage() {
             }
             return (
               <div className="flex flex-col gap-1">
-                <Label>{col.label}</Label>
+                <Label className="text-xs font-medium text-foreground/90">{col.label}</Label>
                 <Input
                   type={col.id === "or_no_start" || col.id === "or_no_end" ? "text" : col.type}
                   inputMode={col.id === "or_no_start" || col.id === "or_no_end" ? "numeric" : undefined}
                   maxLength={col.id === "or_no_start" || col.id === "or_no_end" ? 7 : undefined}
-                  className="w-44"
+                  className={`w-44 ${dashboardInputClass}`}
                   value={filterValue}
                   placeholder={`Search ${col.label}…`}
                   onChange={(e) =>
@@ -642,7 +700,7 @@ export default function PaymentsPage() {
           })()}
 
           {filterColumn && (
-            <Button variant="ghost" size="sm" onClick={() => {
+            <Button variant="ghost" size="sm" className={dashboardGhostButtonClass} onClick={() => {
               setFilterColumn("");
               setFilterValue("");
               setDateRangeFilter({ start: "", end: "" });
@@ -655,107 +713,122 @@ export default function PaymentsPage() {
         </div>
 
         {/* Table */}
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
+        <div ref={tableWrapperRef} className={dashboardTableShellClass}>
+          <Table className={Object.keys(lockedColumnWidths).length > 0 ? "table-fixed text-sm" : "text-sm"}>
+            {Object.keys(lockedColumnWidths).length > 0 ? (
+              <colgroup>
+                {table.getVisibleLeafColumns().map((column) => (
+                  <col key={column.id} style={{ width: lockedColumnWidths[column.id] }} />
                 ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center text-muted-foreground py-8">
-                  No records found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className={newIds.has(row.original.id) ? "bg-green-500/10 transition-colors duration-1000" : editedIds.has(row.original.id) ? "bg-blue-500/10 transition-colors duration-1000" : "transition-colors duration-1000"}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+              </colgroup>
+            ) : null}
+            <TableHeader className="bg-muted/20 [&_tr]:border-b-border/60">
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map((header) => (
+                    <TableHead key={header.id} data-column-id={header.column.id} className="h-11 px-4 text-[13px] font-semibold text-foreground/80">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    No records found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id} className={newIds.has(row.original.id) ? "bg-green-500/10 transition-colors duration-1000 hover:bg-green-500/10" : editedIds.has(row.original.id) ? "bg-blue-500/10 transition-colors duration-1000 hover:bg-blue-500/10" : "transition-colors duration-200 hover:bg-muted/35"}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="px-4 py-3 text-sm">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-4 flex w-full flex-col items-center gap-2 pb-2">
+          <p className="rounded-full border border-border/50 bg-background/85 px-3 py-1 text-center text-xs text-muted-foreground shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
             Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()} &mdash;{" "}
             {table.getFilteredRowModel().rows.length} record{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
           </p>
-          <Pagination className="w-auto justify-end">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); table.previousPage(); }}
-                  aria-disabled={!table.getCanPreviousPage()}
-                  className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); table.nextPage(); }}
-                  aria-disabled={!table.getCanNextPage()}
-                  className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+          <div className="rounded-full border border-border/60 bg-background/95 px-2 py-1.5 shadow-[0_18px_38px_-24px_rgba(15,23,42,0.3)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/90">
+            <Pagination className="w-auto justify-center">
+              <PaginationContent className="gap-1">
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); table.previousPage(); }}
+                    aria-disabled={!table.getCanPreviousPage()}
+                    className={`rounded-full ${!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : ""}`}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => { e.preventDefault(); table.nextPage(); }}
+                    aria-disabled={!table.getCanNextPage()}
+                    className={`rounded-full ${!table.getCanNextPage() ? "pointer-events-none opacity-50" : ""}`}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         </div>
       </div>
 
       {/* Password Prompt */}
       <Dialog open={!!passwordPromptRow} onOpenChange={(o) => { if (!o) { setPasswordPromptRow(null); setPasswordInput(""); setPasswordError(null); } }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Authentication Required</DialogTitle></DialogHeader>
+        <DialogContent className={`sm:max-w-sm ${dashboardDialogClass}`}>
+          <DialogHeader className="gap-1.5"><DialogTitle className="text-base font-semibold tracking-tight">Authentication Required</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <Label>Password</Label>
+              <Label className="text-xs font-medium text-foreground/90">Password</Label>
               <Input
                 type="password"
                 value={passwordInput}
                 onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(null); }}
                 onKeyDown={(e) => { if (e.key === "Enter") handlePasswordSubmit(); }}
                 placeholder="Enter password…"
+                className={dashboardInputClass}
                 autoFocus
               />
             </div>
-            {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+            {passwordError && (
+              <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-destructive">
+                {passwordError}
+              </p>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setPasswordPromptRow(null); setPasswordInput(""); setPasswordError(null); }}>Cancel</Button>
-            <Button onClick={handlePasswordSubmit}>Continue</Button>
+          <DialogFooter className="mt-1 gap-2">
+            <Button variant="ghost" className={dashboardGhostButtonClass} onClick={() => { setPasswordPromptRow(null); setPasswordInput(""); setPasswordError(null); }}>Cancel</Button>
+            <Button className={dashboardPrimaryButtonClass} onClick={handlePasswordSubmit}>Continue</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Edit Payment</DialogTitle></DialogHeader>
+        <DialogContent className={`sm:max-w-md ${dashboardDialogClass}`}>
+          <DialogHeader className="gap-1.5"><DialogTitle className="text-base font-semibold tracking-tight">Edit Payment</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <Label>O.R. Date</Label>
-              <Input type="date" value={editForm.or_date}
+              <Label className="text-xs font-medium text-foreground/90">O.R. Date</Label>
+              <Input type="date" className={dashboardInputClass} value={editForm.or_date}
                 onChange={(e) => setEditForm((f) => ({ ...f, or_date: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
-                <Label>O.R. No. - Start</Label>
-                <Input type="text" inputMode="numeric" maxLength={7} value={editForm.or_no_start}
+                <Label className="text-xs font-medium text-foreground/90">O.R. No. - Start</Label>
+                <Input type="text" inputMode="numeric" maxLength={7} className={dashboardInputClass} value={editForm.or_no_start}
                   onChange={(e) => {
                     const start = sanitizeDigits(e.target.value);
                     setEditError(null);
@@ -763,22 +836,22 @@ export default function PaymentsPage() {
                   }} />
               </div>
               <div className="flex flex-col gap-1">
-                <Label>O.R. No. - End</Label>
-                <Input type="number" className="bg-muted" value={editForm.or_no_end} readOnly />
+                <Label className="text-xs font-medium text-foreground/90">O.R. No. - End</Label>
+                <Input type="number" className={dashboardReadOnlyInputClass} value={editForm.or_no_end} readOnly />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
-                <Label>No. of Pieces</Label>
-                <Input type="number" min="1" value={editForm.pieces}
+                <Label className="text-xs font-medium text-foreground/90">No. of Pieces</Label>
+                <Input type="number" min="1" className={dashboardInputClass} value={editForm.pieces}
                   onChange={(e) => {
                     const pieces = e.target.value;
                     setEditForm((f) => ({ ...f, pieces, or_no_end: computeEnd(f.or_no_start, pieces) }));
                   }} />
               </div>
               <div className="flex flex-col gap-1">
-                <Label>RCD Amount</Label>
-                <Input type="text" inputMode="decimal" value={editForm.rcd_amount}
+                <Label className="text-xs font-medium text-foreground/90">RCD Amount</Label>
+                <Input type="text" inputMode="decimal" className={dashboardInputClass} value={editForm.rcd_amount}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*/g, "$1");
                     setEditForm((f) => ({ ...f, rcd_amount: val }));
@@ -786,35 +859,35 @@ export default function PaymentsPage() {
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <Label>Collector</Label>
+              <Label className="text-xs font-medium text-foreground/90">Collector</Label>
               <Select value={editForm.collector} onValueChange={(v) => setEditForm((f) => ({ ...f, collector: v }))}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger className={`w-full ${dashboardSelectTriggerClass}`}><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>
                   {COLLECTORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="destructive" className="mr-auto" onClick={() => { setDeleteRow(editRow); setEditRow(null); }}>Delete</Button>
-            <Button variant="outline" onClick={() => setEditRow(null)}>Cancel</Button>
-            <Button onClick={handleUpdate}>Save</Button>
+          <DialogFooter className="mt-1 gap-2 sm:items-center">
+            <Button variant="destructive" className={`mr-auto ${dashboardPrimaryButtonClass}`} onClick={() => { setDeleteRow(editRow); setEditRow(null); }}>Delete</Button>
+            <Button variant="ghost" className={dashboardGhostButtonClass} onClick={() => setEditRow(null)}>Cancel</Button>
+            <Button className={dashboardPrimaryButtonClass} onClick={handleUpdate}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)}>
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this record?</AlertDialogTitle>
-            <AlertDialogDescription>
+        <AlertDialogContent size="sm" className={dashboardDialogClass}>
+          <AlertDialogHeader className="gap-1.5">
+            <AlertDialogTitle className="text-base font-semibold tracking-tight">Delete this record?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-relaxed text-muted-foreground">
               This will permanently remove the payment entry. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDelete}>Delete</AlertDialogAction>
+          <AlertDialogFooter className="mt-1 gap-2">
+            <AlertDialogCancel className={dashboardGhostButtonClass}>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" className={dashboardPrimaryButtonClass} onClick={handleDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

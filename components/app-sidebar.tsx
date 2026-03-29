@@ -4,15 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CreditCardIcon,
-  SignOutIcon,
   UserIcon,
 } from "@phosphor-icons/react";
-import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -20,9 +16,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   SidebarSeparator,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 const navItems = [
@@ -33,40 +27,41 @@ const accountItems = [
   { label: "Profile", href: "/dashboard/profile", icon: UserIcon },
 ];
 
+const sidebarHeaderShellClass =
+  "flex items-center gap-2 rounded-2xl border border-sidebar-border/60 bg-sidebar-accent/35 px-2.5 py-2 shadow-sm";
+const sidebarSectionLabelClass =
+  "px-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-sidebar-foreground/60";
+const sidebarMenuButtonClass =
+  "rounded-xl border border-transparent px-2.5 py-2 text-[13px] transition-[background-color,border-color,box-shadow,color] duration-200 hover:border-sidebar-border/70 hover:bg-sidebar-accent/70 hover:shadow-sm data-[active=true]:border-sidebar-border/80 data-[active=true]:bg-sidebar-accent data-[active=true]:shadow-sm";
+
 export function AppSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function handleSignOut() {
-    await authClient.signOut();
-    window.sessionStorage.setItem("auth-flash", "logout-success");
-    router.push("/");
-  }
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1">
-          <SidebarTrigger />
-          <span className="text-xs font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border/60">
+      <SidebarHeader className="p-3">
+        <div className={`${sidebarHeaderShellClass} justify-center group-data-[collapsible=icon]:px-0`}>
+          <CreditCardIcon className="size-4 shrink-0" />
+          <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
             Payment Query
           </span>
         </div>
       </SidebarHeader>
 
-      <SidebarSeparator />
+      <SidebarSeparator className="mx-3 bg-sidebar-border/60" />
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
+        <SidebarGroup className="px-3 py-2">
+          <SidebarGroupLabel className={sidebarSectionLabelClass}>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
                     tooltip={item.label}
+                    className={sidebarMenuButtonClass}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -79,18 +74,19 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator />
+        <SidebarSeparator className="mx-3 bg-sidebar-border/60" />
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Account</SidebarGroupLabel>
+        <SidebarGroup className="px-3 py-2">
+          <SidebarGroupLabel className={sidebarSectionLabelClass}>Account</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {accountItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={pathname === item.href}
                     tooltip={item.label}
+                    className={sidebarMenuButtonClass}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -104,24 +100,6 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarSeparator />
-
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Sign Out"
-              onClick={handleSignOut}
-              className="text-destructive hover:text-destructive"
-            >
-              <SignOutIcon />
-              <span>Sign Out</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-
-      <SidebarRail />
     </Sidebar>
   );
 }
