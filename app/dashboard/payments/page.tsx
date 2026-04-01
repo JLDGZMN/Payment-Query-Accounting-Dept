@@ -83,6 +83,8 @@ const COLLECTORS = [
 ];
 
 const PAGE_SIZE = 10;
+const OR_DIGITS = 7;
+const OR_MAX = 9_999_999;
 
 interface Payment {
   id: number;
@@ -134,8 +136,16 @@ const dashboardDialogClass =
 const dashboardTableShellClass =
   "overflow-hidden rounded-3xl border border-border/60 bg-background/94 shadow-[0_22px_50px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/90";
 
-function sanitizeDigits(value: string, maxLength = 7) {
+function sanitizeDigits(value: string, maxLength = OR_DIGITS) {
   return value.replace(/[^0-9]/g, "").slice(0, maxLength);
+}
+
+function isExactOrNumber(value: string) {
+  return /^\d{7}$/.test(value);
+}
+
+function formatOrNumber(value: number) {
+  return String(value).padStart(OR_DIGITS, "0");
 }
 
 function toLocalDateString(value: string) {
@@ -219,10 +229,16 @@ export default function PaymentsPage() {
   }, [editRow]);
 
   function computeEnd(start: string, pieces: string): string {
+    if (!isExactOrNumber(start) || !/^\d+$/.test(pieces)) return "";
+
     const s = parseInt(start);
     const p = parseInt(pieces);
     if (isNaN(s) || isNaN(p) || p < 1) return "";
-    return String(s + p - 1);
+
+    const end = s + p - 1;
+    if (end > OR_MAX) return "";
+
+    return formatOrNumber(end);
   }
 
   function validatePaymentForm(values: PaymentForm, ignoreId?: number): { summary: string | null; fieldErrors: FormErrors } {
@@ -236,10 +252,14 @@ export default function PaymentsPage() {
 
     if (values.or_no_start && !/^\d+$/.test(values.or_no_start)) {
       fieldErrors.or_no_start = "O.R. start number must contain digits only.";
+    } else if (values.or_no_start && !isExactOrNumber(values.or_no_start)) {
+      fieldErrors.or_no_start = "O.R. start number must be exactly 7 digits.";
     }
 
     if (values.or_no_end && !/^\d+$/.test(values.or_no_end)) {
       fieldErrors.or_no_end = "O.R. end number is invalid.";
+    } else if (values.or_no_end && !isExactOrNumber(values.or_no_end)) {
+      fieldErrors.or_no_end = "O.R. end number must be exactly 7 digits.";
     }
 
     if (values.pieces && (!/^\d+$/.test(values.pieces) || Number(values.pieces) < 1)) {
@@ -252,6 +272,16 @@ export default function PaymentsPage() {
 
     const start = Number(values.or_no_start);
     const end = Number(values.or_no_end);
+
+    if (!fieldErrors.pieces && isExactOrNumber(values.or_no_start) && /^\d+$/.test(values.pieces)) {
+      const computedEnd = computeEnd(values.or_no_start, values.pieces);
+      if (!computedEnd) {
+        fieldErrors.pieces = "O.R. range cannot go beyond 9999999.";
+        fieldErrors.or_no_end = fieldErrors.or_no_end ?? "O.R. end number exceeds 7 digits.";
+      } else if (values.or_no_end !== computedEnd) {
+        fieldErrors.or_no_end = fieldErrors.or_no_end ?? "O.R. end number is invalid.";
+      }
+    }
 
     if (values.or_no_start && values.or_no_end && (Number.isNaN(start) || Number.isNaN(end) || start > end)) {
       fieldErrors.or_no_start = fieldErrors.or_no_start ?? "O.R. range is invalid.";
@@ -568,7 +598,7 @@ export default function PaymentsPage() {
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-foreground/90">O.R. No. - End</Label>
-            <Input type="number" className={`w-28 ${dashboardReadOnlyInputClass}`} value={form.or_no_end} readOnly />
+            <Input type="text" inputMode="numeric" className={`w-28 ${dashboardReadOnlyInputClass}`} value={form.or_no_end} readOnly />
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-foreground/90">No. of Pieces</Label>
@@ -837,7 +867,7 @@ export default function PaymentsPage() {
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs font-medium text-foreground/90">O.R. No. - End</Label>
-                <Input type="number" className={dashboardReadOnlyInputClass} value={editForm.or_no_end} readOnly />
+                <Input type="text" inputMode="numeric" className={dashboardReadOnlyInputClass} value={editForm.or_no_end} readOnly />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">

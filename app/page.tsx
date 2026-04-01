@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
@@ -28,7 +28,39 @@ const authPrimaryButtonClass =
 const authGhostButtonClass =
   "h-10 rounded-xl border border-transparent transition-[background-color,border-color,color] duration-200 hover:border-border/40 hover:bg-muted/60";
 
-export default function SignInPage() {
+function SignInCardShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthBackground>
+      <Card className={authCardClass}>
+        <CardHeader className="gap-1.5 px-6 pt-6 pb-1">
+          <CardTitle className="text-xl font-semibold tracking-tight">Sign In</CardTitle>
+          <CardDescription className="text-sm leading-relaxed">
+            Enter your credentials to access your account.
+          </CardDescription>
+        </CardHeader>
+        {children}
+      </Card>
+    </AuthBackground>
+  );
+}
+
+function SignInPageFallback() {
+  return (
+    <SignInCardShell>
+      <div className="px-6 pb-6">
+        <div className="rounded-xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-muted-foreground shadow-sm">
+          Loading sign-in form...
+        </div>
+      </div>
+    </SignInCardShell>
+  );
+}
+
+function SignInPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
@@ -67,15 +99,7 @@ export default function SignInPage() {
   }
 
   return (
-    <AuthBackground>
-      <Card className={authCardClass}>
-        <CardHeader className="gap-1.5 px-6 pt-6 pb-1">
-          <CardTitle className="text-xl font-semibold tracking-tight">Sign In</CardTitle>
-          <CardDescription className="text-sm leading-relaxed">
-            Enter your credentials to access your account.
-          </CardDescription>
-        </CardHeader>
-
+    <SignInCardShell>
         <form onSubmit={handleSubmit}>
           <CardContent className="flex flex-col gap-4 px-6 py-5">
             {signupSuccessMessage && (
@@ -130,7 +154,14 @@ export default function SignInPage() {
             </Button>
           </CardFooter>
         </form>
-      </Card>
-    </AuthBackground>
+    </SignInCardShell>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<SignInPageFallback />}>
+      <SignInPageContent />
+    </Suspense>
   );
 }
