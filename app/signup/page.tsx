@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import {
+  getPasswordValidation,
+  getPasswordValidationErrorMessage,
+} from "@/lib/password-validation";
 import { AuthBackground } from "@/components/auth-background";
 import {
   Card,
@@ -35,10 +39,17 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const passwordValidation = useMemo(() => getPasswordValidation(password), [password]);
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
 
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     setError("");
+
+    if (!passwordValidation.isValid) {
+      setError(getPasswordValidationErrorMessage(password));
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
@@ -76,7 +87,9 @@ export default function SignUpPage() {
       <Card className={authCardClass}>
         <CardHeader className="gap-1.5 px-6 pt-6 pb-1">
           <CardTitle className="text-xl font-semibold tracking-tight">Sign Up</CardTitle>
-          <CardDescription className="text-sm leading-relaxed">Create a new account to get started.</CardDescription>
+          <CardDescription className="text-sm leading-relaxed">
+            Create a new account to get started.
+          </CardDescription>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
@@ -90,7 +103,10 @@ export default function SignUpPage() {
                 type="text"
                 placeholder="Juan Dela Cruz"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError("");
+                }}
                 className={authInputClass}
                 required
               />
@@ -105,7 +121,10 @@ export default function SignUpPage() {
                 type="email"
                 placeholder="you@gmail.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError("");
+                }}
                 className={authInputClass}
                 required
               />
@@ -120,7 +139,10 @@ export default function SignUpPage() {
                 type="text"
                 placeholder="Enter your username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setError("");
+                }}
                 className={authInputClass}
                 required
               />
@@ -133,12 +155,39 @@ export default function SignUpPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Create a password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError("");
+                }}
+                aria-describedby={error ? "password-requirements signup-error" : "password-requirements"}
+                aria-invalid={password.length > 0 && !passwordValidation.isValid}
                 className={authInputClass}
                 required
               />
+              <ul
+                id="password-requirements"
+                className="mt-1 space-y-1 rounded-2xl border border-border/50 bg-muted/20 px-3.5 py-3 text-xs"
+              >
+                {passwordValidation.requirements.map((requirement) => {
+                  const itemClass =
+                    password.length === 0
+                      ? "text-muted-foreground"
+                      : requirement.isValid
+                        ? "text-green-600"
+                        : "text-destructive";
+
+                  return (
+                    <li key={requirement.id} className={`flex items-center gap-2 ${itemClass}`}>
+                      <span aria-hidden="true" className="inline-flex w-4 justify-center font-semibold">
+                        {requirement.isValid ? "✓" : "✗"}
+                      </span>
+                      <span>{requirement.label}</span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -148,16 +197,32 @@ export default function SignUpPage() {
               <Input
                 id="confirmPassword"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Confirm your password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setError("");
+                }}
+                aria-describedby={error ? "confirm-password-status signup-error" : "confirm-password-status"}
+                aria-invalid={confirmPassword.length > 0 && !passwordsMatch}
                 className={authInputClass}
                 required
               />
+              {confirmPassword ? (
+                <p
+                  id="confirm-password-status"
+                  className={`text-xs ${passwordsMatch ? "text-green-600" : "text-amber-600"}`}
+                >
+                  {passwordsMatch ? "Passwords match." : "Passwords do not match yet."}
+                </p>
+              ) : null}
             </div>
 
             {error && (
-              <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-destructive">
+              <p
+                id="signup-error"
+                className="rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-destructive"
+              >
                 {error}
               </p>
             )}
@@ -167,7 +232,12 @@ export default function SignUpPage() {
             <Button type="submit" className={`w-full ${authPrimaryButtonClass}`} disabled={loading}>
               {loading ? "Please wait..." : "Create Account"}
             </Button>
-            <Button type="button" variant="ghost" className={`w-full ${authGhostButtonClass}`} asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className={`w-full ${authGhostButtonClass}`}
+              asChild
+            >
               <Link href="/">Already have an account? Sign In</Link>
             </Button>
           </CardFooter>
