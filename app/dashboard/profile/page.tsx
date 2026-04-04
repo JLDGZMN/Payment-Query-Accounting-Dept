@@ -11,6 +11,10 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useSession, authClient } from "@/lib/auth-client";
+import {
+  getPasswordValidation,
+  getPasswordValidationErrorMessage,
+} from "@/lib/password-validation";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -39,28 +43,6 @@ function getInitials(name?: string | null) {
 
   if (parts.length === 0) return "U";
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
-}
-
-function getPasswordStrength(password: string) {
-  if (!password) {
-    return { label: "Add a new password", tone: "text-muted-foreground" };
-  }
-
-  let score = 0;
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password) && /\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-
-  if (score <= 1) {
-    return { label: "Weak", tone: "text-destructive" };
-  }
-
-  if (score <= 3) {
-    return { label: "Good", tone: "text-amber-600" };
-  }
-
-  return { label: "Strong", tone: "text-green-600" };
 }
 
 const dashboardCardClass =
@@ -108,7 +90,7 @@ export default function ProfilePage() {
   const currentName = session?.user?.name ?? "";
   const currentEmail = session?.user?.email ?? "";
   const username = (session?.user as Record<string, string> | undefined)?.username ?? "";
-  const passwordStrength = useMemo(() => getPasswordStrength(newPassword), [newPassword]);
+  const passwordValidation = useMemo(() => getPasswordValidation(newPassword), [newPassword]);
   const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
   const nameChanged = name.trim() !== "" && name.trim() !== currentName;
 
@@ -162,13 +144,13 @@ export default function ProfilePage() {
     setPwError("");
     setPwSuccess(false);
 
-    if (newPassword !== confirmPassword) {
-      setPwError("New passwords do not match.");
+    if (!passwordValidation.isValid) {
+      setPwError(getPasswordValidationErrorMessage(newPassword));
       return;
     }
 
-    if (newPassword.length < 8) {
-      setPwError("Password must be at least 8 characters.");
+    if (newPassword !== confirmPassword) {
+      setPwError("New passwords do not match.");
       return;
     }
 
@@ -362,12 +344,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="newPassword" className="text-xs font-medium text-foreground/90">New password</Label>
-                    <span className={`text-xs font-medium ${passwordStrength.tone}`}>
-                      {passwordStrength.label}
-                    </span>
-                  </div>
+                  <Label htmlFor="newPassword" className="text-xs font-medium text-foreground/90">New password</Label>
                   <div className="relative">
                     <Input
                       id="newPassword"
@@ -379,6 +356,8 @@ export default function ProfilePage() {
                         setPwError("");
                         setPwSuccess(false);
                       }}
+                      aria-describedby={pwError ? "profile-password-requirements profile-password-error" : "profile-password-requirements"}
+                      aria-invalid={newPassword.length > 0 && !passwordValidation.isValid}
                       disabled={pwLoading}
                       required
                       className={`${dashboardInputClass} pr-12`}
@@ -392,9 +371,28 @@ export default function ProfilePage() {
                       {showNewPassword ? <EyeSlashIcon size={18} /> : <EyeIcon size={18} />}
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Use at least 8 characters, plus a mix of letters, numbers, and symbols.
-                  </p>
+                  <ul
+                    id="profile-password-requirements"
+                    className="mt-1 space-y-1 rounded-2xl border border-border/50 bg-muted/20 px-3.5 py-3 text-xs"
+                  >
+                    {passwordValidation.requirements.map((requirement) => {
+                      const itemClass =
+                        newPassword.length === 0
+                          ? "text-muted-foreground"
+                          : requirement.isValid
+                            ? "text-green-600"
+                            : "text-destructive";
+
+                      return (
+                        <li key={requirement.id} className={`flex items-center gap-2 ${itemClass}`}>
+                          <span aria-hidden="true" className="inline-flex w-4 justify-center font-semibold">
+                            {requirement.isValid ? "OK" : "X"}
+                          </span>
+                          <span>{requirement.label}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
 
                 <div className="space-y-2">
@@ -410,6 +408,8 @@ export default function ProfilePage() {
                         setPwError("");
                         setPwSuccess(false);
                       }}
+                      aria-describedby={pwError ? "profile-confirm-password-status profile-password-error" : "profile-confirm-password-status"}
+                      aria-invalid={confirmPassword.length > 0 && !passwordsMatch}
                       disabled={pwLoading}
                       required
                       className={`${dashboardInputClass} pr-12`}
@@ -424,19 +424,21 @@ export default function ProfilePage() {
                     </button>
                   </div>
                   {confirmPassword ? (
-                    <p className={`text-xs ${passwordsMatch ? "text-green-600" : "text-amber-600"}`}>
+                    <p
+                      id="profile-confirm-password-status"
+                      className={`text-xs ${passwordsMatch ? "text-green-600" : "text-amber-600"}`}
+                    >
                       {passwordsMatch ? "Passwords match." : "Passwords do not match yet."}
                     </p>
                   ) : null}
                 </div>
 
                 <div className={`p-4 text-sm text-muted-foreground ${dashboardMutedPanelClass}`}>
-                  Changing your password will sign out your other active sessions for extra
-                  protection.
+                  For your security, use a strong and unique password when updating your account.
                 </div>
 
                 {pwError ? (
-                  <p className={`flex items-center gap-2 ${dashboardErrorClass}`}>
+                  <p id="profile-password-error" className={`flex items-center gap-2 ${dashboardErrorClass}`}>
                     <WarningCircleIcon size={16} />
                     {pwError}
                   </p>

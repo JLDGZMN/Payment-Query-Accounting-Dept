@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { getRcdAmountValidationError } from "@/lib/payment-validation";
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 async function requireSession(request: NextRequest) {
@@ -34,6 +35,10 @@ export async function POST(request: NextRequest) {
 
   if (!or_date || !or_no_start || !or_no_end || !pieces || !rcd_amount || !collector)
     return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+
+  const rcdAmountError = getRcdAmountValidationError(rcd_amount);
+  if (rcdAmountError)
+    return NextResponse.json({ error: rcdAmountError }, { status: 400 });
 
   const start = parseInt(or_no_start);
   const end = parseInt(or_no_end);

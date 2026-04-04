@@ -25,7 +25,7 @@ export function AuthFlashToast() {
 
       toast.success(
         formattedUsername
-          ? `Login successful. Welcome back, ${formattedUsername}.`
+          ? `Login successful. Welcome back, ${formattedUsername}!`
           : "Login successful, good to have you back."
       );
       window.sessionStorage.removeItem(AUTH_FLASH_KEY);
@@ -33,7 +33,7 @@ export function AuthFlashToast() {
     }
 
     if (flash === "logout-success" && pathname === "/") {
-      toast.success("You have logged out successfully.");
+      toast.success("You have been logged out.");
       window.sessionStorage.removeItem(AUTH_FLASH_KEY);
       window.sessionStorage.removeItem(AUTH_FLASH_USERNAME_KEY);
     }

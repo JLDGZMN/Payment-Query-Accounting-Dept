@@ -71,20 +71,25 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { getRcdAmountValidationError } from "@/lib/payment-validation";
 
 const COLLECTORS = [
-  "Juan Dela Cruz",
-  "Maria Clara",
-  "Joebert Joe",
-  "Charlie Smith",
-  "Bob Santos",
-  "Alice Reyes",
+  "Julio De Guzman",
+  "Ivy Callope",
+  "Carla Buganan",
+  "Lacel Centeno",
+  "Rizza Rovira",
+  "Baby Jane De Jesus",
   
 ];
 
 const PAGE_SIZE = 10;
 const OR_DIGITS = 7;
 const OR_MAX = 9_999_999;
+const PIECES_UI_DIGITS = 4;
+const RCD_AMOUNT_PRECISION = 12;
+const RCD_AMOUNT_SCALE = 2;
+const RCD_AMOUNT_INTEGER_DIGITS = RCD_AMOUNT_PRECISION - RCD_AMOUNT_SCALE;
 
 interface Payment {
   id: number;
@@ -135,9 +140,30 @@ const dashboardDialogClass =
   "rounded-3xl border border-border/60 bg-background/95 p-6 shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/90";
 const dashboardTableShellClass =
   "overflow-hidden rounded-3xl border border-border/60 bg-background/94 shadow-[0_22px_50px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/90";
+const dashboardBannerClass =
+  "flex min-h-[88px] shrink-0 items-center border-b border-border/60 px-4 sm:px-6";
+const dashboardBannerBodyClass =
+  "flex w-full items-center gap-3 py-5 text-left";
+const dashboardBannerEyebrowClass =
+  "text-[10px] font-semibold uppercase tracking-[0.34em] text-sky-700/85";
+const dashboardBannerTitleClass =
+  "mt-1 text-[1.45rem] font-semibold tracking-tight text-foreground sm:text-[1.7rem]";
 
 function sanitizeDigits(value: string, maxLength = OR_DIGITS) {
   return value.replace(/[^0-9]/g, "").slice(0, maxLength);
+}
+
+function sanitizeRcdAmountInput(value: string) {
+  const sanitized = value.replace(/[^0-9.]/g, "");
+  const [rawWholePart = "", ...rawDecimalParts] = sanitized.split(".");
+  const wholePart = rawWholePart.slice(0, RCD_AMOUNT_INTEGER_DIGITS);
+  const decimalPart = rawDecimalParts.join("").slice(0, RCD_AMOUNT_SCALE);
+
+  if (sanitized.includes(".")) {
+    return `${wholePart}.${decimalPart}`;
+  }
+
+  return wholePart;
 }
 
 function isExactOrNumber(value: string) {
@@ -274,8 +300,11 @@ export default function PaymentsPage() {
       fieldErrors.pieces = "Pieces must be a whole number greater than 0.";
     }
 
-    if (values.rcd_amount && !/^\d+(\.\d{1,2})?$/.test(values.rcd_amount)) {
-      fieldErrors.rcd_amount = "Use a valid amount with up to 2 decimal places.";
+    if (values.rcd_amount) {
+      const rcdAmountError = getRcdAmountValidationError(values.rcd_amount);
+      if (rcdAmountError) {
+        fieldErrors.rcd_amount = rcdAmountError;
+      }
     }
 
     const start = Number(values.or_no_start);
@@ -527,10 +556,15 @@ export default function PaymentsPage() {
 
   return (
     <SidebarInset>
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-        <SidebarTrigger className="-ml-1 md:hidden" />
-        <Separator orientation="vertical" className="mr-2 h-4 md:hidden" />
-        <span className="text-xs font-medium text-muted-foreground">Payments</span>
+      <header className={dashboardBannerClass}>
+        <div className={dashboardBannerBodyClass}>
+          <SidebarTrigger className="-ml-1 md:hidden" />
+          <Separator orientation="vertical" className="mr-1 h-4 md:hidden" />
+          <div>
+            <p className={dashboardBannerEyebrowClass}>Accounting System</p>
+            <h1 className={dashboardBannerTitleClass}>Payment Query Portal</h1>
+          </div>
+        </div>
       </header>
 
       <div className="flex flex-col gap-4 p-4 pb-4">
@@ -581,19 +615,19 @@ export default function PaymentsPage() {
                 <Card key={stat.label} className={dashboardCardClass}>
                   <CardHeader className="gap-3 px-5 pt-5 pb-2">
                     <div className="flex items-center justify-between gap-3">
-                      <CardDescription className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">
+                      <CardDescription className="text-xs uppercase tracking-[0.14em] text-muted-foreground/80">
                         {stat.label}
                       </CardDescription>
                       <div className="flex size-9 items-center justify-center rounded-2xl border border-border/50 bg-background/75 shadow-sm">
-                        <stat.icon className="size-4 text-muted-foreground" />
+                        <stat.icon className="size-4 text-sky-700/85" />
                       </div>
                     </div>
-                    <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
+                    <CardTitle className="text-3xl font-semibold tracking-tight tabular-nums">
                       {stat.value}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-5 pb-5 pt-0">
-                    <p className="text-xs leading-relaxed text-muted-foreground">{stat.description}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{stat.description}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -619,17 +653,23 @@ export default function PaymentsPage() {
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-foreground/90">No. of Pieces</Label>
-            <Input type="number" min="1" className={`w-24 ${dashboardInputClass}`} value={form.pieces}
+            <Input
+              type="text"
+              inputMode="numeric"
+              maxLength={PIECES_UI_DIGITS}
+              className={`w-24 ${dashboardInputClass}`}
+              value={form.pieces}
               onChange={(e) => {
-                const pieces = e.target.value;
+                const pieces = sanitizeDigits(e.target.value, PIECES_UI_DIGITS);
                 setForm((f) => ({ ...f, pieces, or_no_end: computeEnd(f.or_no_start, pieces) }));
-              }} />
+              }}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs font-medium text-foreground/90">RCD Amount</Label>
             <Input type="text" inputMode="decimal" className={`w-32 ${dashboardInputClass}`} value={form.rcd_amount}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*/g, "$1");
+                const val = sanitizeRcdAmountInput(e.target.value);
                 setForm((f) => ({ ...f, rcd_amount: val }));
               }} />
           </div>
@@ -912,19 +952,25 @@ export default function PaymentsPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs font-medium text-foreground/90">No. of Pieces</Label>
-                <Input type="number" min="1" className={dashboardInputClass} value={editForm.pieces}
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={PIECES_UI_DIGITS}
+                  className={dashboardInputClass}
+                  value={editForm.pieces}
                   onChange={(e) => {
-                    const pieces = e.target.value;
+                    const pieces = sanitizeDigits(e.target.value, PIECES_UI_DIGITS);
                     setEditError(null);
                     setEditFieldErrors({});
                     setEditForm((f) => ({ ...f, pieces, or_no_end: computeEnd(f.or_no_start, pieces) }));
-                  }} />
+                  }}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs font-medium text-foreground/90">RCD Amount</Label>
                 <Input type="text" inputMode="decimal" className={dashboardInputClass} value={editForm.rcd_amount}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*/g, "$1");
+                    const val = sanitizeRcdAmountInput(e.target.value);
                     setEditError(null);
                     setEditFieldErrors({});
                     setEditForm((f) => ({ ...f, rcd_amount: val }));
