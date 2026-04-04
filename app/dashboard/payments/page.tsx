@@ -148,12 +148,18 @@ function formatOrNumber(value: number) {
   return String(value).padStart(OR_DIGITS, "0");
 }
 
+function getTodayDateString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function toLocalDateString(value: string) {
   const d = new Date(value);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function PaymentsPage() {
+  const todayDate = useMemo(() => getTodayDateString(), []);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -162,8 +168,8 @@ export default function PaymentsPage() {
 
   const [editRow, setEditRow] = useState<Payment | null>(null);
   const [editForm, setEditForm] = useState(emptyForm);
-  const [, setEditError] = useState<string | null>(null);
-  const [, setEditFieldErrors] = useState<FormErrors>({});
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editFieldErrors, setEditFieldErrors] = useState<FormErrors>({});
   const [deleteRow, setDeleteRow] = useState<Payment | null>(null);
 
   const [passwordPromptRow, setPasswordPromptRow] = useState<Payment | null>(null);
@@ -225,6 +231,8 @@ export default function PaymentsPage() {
         rcd_amount: String(editRow.rcd_amount),
         collector: editRow.collector,
       });
+      setEditError(null);
+      setEditFieldErrors({});
     }
   }, [editRow]);
 
@@ -352,6 +360,15 @@ export default function PaymentsPage() {
 
   async function handleUpdate() {
     if (!editRow) return;
+
+    if (editForm.or_date && editForm.or_date > todayDate) {
+      const message = "OR Date cannot be later than today.";
+      setEditFieldErrors({ or_date: message });
+      setEditError(message);
+      toast.error(message);
+      return;
+    }
+
     const validation = validatePaymentForm(editForm, editRow.id);
     if (validation.summary) {
       setEditFieldErrors(validation.fieldErrors);
@@ -846,14 +863,35 @@ export default function PaymentsPage() {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
+      <Dialog
+        open={!!editRow}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditRow(null);
+            setEditError(null);
+            setEditFieldErrors({});
+          }
+        }}
+      >
         <DialogContent className={`sm:max-w-md ${dashboardDialogClass}`}>
           <DialogHeader className="gap-1.5"><DialogTitle className="text-base font-semibold tracking-tight">Edit Payment</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <Label className="text-xs font-medium text-foreground/90">O.R. Date</Label>
-              <Input type="date" className={dashboardInputClass} value={editForm.or_date}
-                onChange={(e) => setEditForm((f) => ({ ...f, or_date: e.target.value }))} />
+              <Input
+                type="date"
+                max={todayDate}
+                className={dashboardInputClass}
+                value={editForm.or_date}
+                onChange={(e) => {
+                  setEditError(null);
+                  setEditFieldErrors((prev) => ({ ...prev, or_date: undefined }));
+                  setEditForm((f) => ({ ...f, or_date: e.target.value }));
+                }}
+              />
+              {editFieldErrors.or_date ? (
+                <p className="text-xs text-destructive">{editFieldErrors.or_date}</p>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
@@ -862,6 +900,7 @@ export default function PaymentsPage() {
                   onChange={(e) => {
                     const start = sanitizeDigits(e.target.value);
                     setEditError(null);
+                    setEditFieldErrors({});
                     setEditForm((f) => ({ ...f, or_no_start: start, or_no_end: computeEnd(start, f.pieces) }));
                   }} />
               </div>
@@ -876,6 +915,8 @@ export default function PaymentsPage() {
                 <Input type="number" min="1" className={dashboardInputClass} value={editForm.pieces}
                   onChange={(e) => {
                     const pieces = e.target.value;
+                    setEditError(null);
+                    setEditFieldErrors({});
                     setEditForm((f) => ({ ...f, pieces, or_no_end: computeEnd(f.or_no_start, pieces) }));
                   }} />
               </div>
@@ -884,23 +925,44 @@ export default function PaymentsPage() {
                 <Input type="text" inputMode="decimal" className={dashboardInputClass} value={editForm.rcd_amount}
                   onChange={(e) => {
                     const val = e.target.value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*/g, "$1");
+                    setEditError(null);
+                    setEditFieldErrors({});
                     setEditForm((f) => ({ ...f, rcd_amount: val }));
                   }} />
               </div>
             </div>
             <div className="flex flex-col gap-1">
               <Label className="text-xs font-medium text-foreground/90">Collector</Label>
-              <Select value={editForm.collector} onValueChange={(v) => setEditForm((f) => ({ ...f, collector: v }))}>
+              <Select value={editForm.collector} onValueChange={(v) => {
+                setEditError(null);
+                setEditFieldErrors({});
+                setEditForm((f) => ({ ...f, collector: v }));
+              }}>
                 <SelectTrigger className={`w-full ${dashboardSelectTriggerClass}`}><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>
                   {COLLECTORS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            {editError && !editFieldErrors.or_date ? (
+              <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-destructive">
+                {editError}
+              </p>
+            ) : null}
           </div>
           <DialogFooter className="mt-1 gap-2 sm:items-center">
             <Button variant="destructive" className={`mr-auto ${dashboardPrimaryButtonClass}`} onClick={() => { setDeleteRow(editRow); setEditRow(null); }}>Delete</Button>
-            <Button variant="ghost" className={dashboardGhostButtonClass} onClick={() => setEditRow(null)}>Cancel</Button>
+            <Button
+              variant="ghost"
+              className={dashboardGhostButtonClass}
+              onClick={() => {
+                setEditRow(null);
+                setEditError(null);
+                setEditFieldErrors({});
+              }}
+            >
+              Cancel
+            </Button>
             <Button className={dashboardPrimaryButtonClass} onClick={handleUpdate}>Save</Button>
           </DialogFooter>
         </DialogContent>
